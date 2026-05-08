@@ -1,0 +1,120 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    
+    // 0. Global Safety Net
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    // --- HELPERS ---
+    
+    function isSignedIn() {
+      return request.auth != null && request.auth.token.email_verified == true;
+    }
+
+    function isValidId(id) {
+      return id is string && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-]+$');
+    }
+
+    function incoming() { return request.resource.data; }
+    function existing() { return resource.data; }
+
+    function isMember(orgId) {
+      let org = get(/databases/$(database)/documents/organizations/$(orgId)).data;
+      return isSignedIn() && (org.ownerId == request.auth.uid || request.auth.uid in org.members);
+    }
+
+    function isDocOwner() {
+      return isSignedIn() && resource.data.ownerId == request.auth.uid;
+    }
+
+    function isAdmin() {
+      return isSignedIn() && exists(/databases/$(database)/documents/system/users/$(request.auth.uid)) && get(/databases/$(database)/documents/system/users/$(request.auth.uid)).data.role == 'ADMIN';
+    }
+
+    // --- VALIDATION BLUEPRINTS ---
+
+    function isValidOrg(data) {
+      return data.orgId is string && data.name is string && data.businessType in ['CAFE', 'REST', 'IND', 'RETAIL']
+          && data.ownerId == request.auth.uid
+          && data.keys().hasAll(['orgId', 'name', 'businessType', 'ownerId']);
+    }
+
+    function isValidZone(data) {
+      return data.nome is string && data.type in ['AMBIENT', 'POSITIVE_COLD', 'NEGATIVE_COLD', 'HOT_ZONE', 'CRITICAL_RISK', 'ALLERGEN_ISOLATED']
+          && data.usageState in ['NO_MANIPULATION', 'MANIPULATION', 'PREPARATION'];
+    }
+
+    function isValidEquipment(data) {
+      return data.type in ['FRIDGE', 'OVEN', 'FREEZER', 'BENCH'] && data.zoneId is string;
+    }
+
+    // --- MATCH BLOCKS ---
+
+    match /organizations/{orgId} {
+      allow get: if isDocOwner() || (isSignedIn() && request.auth.uid in resource.data.members);
+      allow list: if isDocOwner();
+      allow create: if isSignedIn() && isValidId(orgId) && isValidOrg(incoming());
+      allow update: if isDocOwner() && isValidOrg(incoming()) && incoming().ownerId == existing().ownerId;
+
+      match /zones/{zoneId} {
+        allow read, write: if isMember(orgId);
+        allow create: if isMember(orgId) && isValidZone(incoming());
+      }
+
+      match /cleaningPlans/{planId} {
+        allow read, write: if isMember(orgId);
+      }
+
+      match /cleaningLogs/{logId} {
+        allow read, write: if isMember(orgId);
+      }
+
+      match /msds/{msdsId} {
+        allow read, write: if isMember(orgId);
+      }
+      
+      match /rawMaterialsFTS/{ftsId} {
+        allow read, write: if isMember(orgId);
+      }
+
+      match /productManuals/{manualId} {
+        allow read, write: if isMember(orgId);
+      }
+
+      match /accessLogs/{logId} {
+        // Only admins can see logs. If it's an admin log, definitely only admins.
+        allow read: if isMember(orgId) && isAdmin();
+        // Any member can create a log entry for their own action
+        allow create: if isMember(orgId) && request.auth.uid == request.resource.data.userId;
+      }
+
+      match /ccps/{ccpId} {
+        allow read, write: if isMember(orgId);
+      }
+
+      match /suppliers/{supplierId} {
+        allow read, write: if isMember(orgId);
+      }
+
+      match /equipment/{eqId} {
+        allow read, write: if isMember(orgId);
+        allow create: if isMember(orgId) && isValidEquipment(incoming());
+      }
+
+      match /sensors/{sensorId} {
+        allow read, write: if isMember(orgId);
+      }
+
+      match /receipts/{receiptId} {
+        allow read, write: if isMember(orgId);
+      }
+    }
+
+    match /system/users/{userId} {
+      allow read: if isSignedIn() && (request.auth.uid == userId || isAdmin());
+      allow write: if isSignedIn() && isAdmin();
+    }
+  }
+}

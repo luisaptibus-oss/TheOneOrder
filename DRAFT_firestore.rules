@@ -1,0 +1,101 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    
+    // 0. Global Safety Net
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    // --- HELPERS ---
+    
+    function isSignedIn() {
+      return request.auth != null && request.auth.token.email_verified == true;
+    }
+
+    function isValidId(id) {
+      return id is string && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-]+$');
+    }
+
+    function incoming() { return request.resource.data; }
+    function existing() { return resource.data; }
+
+    // --- VALIDATION BLUEPRINTS ---
+
+    function isValidAsset(data) {
+      return data.unidade_id is string && data.unidade_id.size() <= 64 
+          && data.nome is string && data.nome.size() <= 100
+          && data.tipo is string && data.tipo.size() <= 50
+          && data.ownerId == request.auth.uid
+          && data.keys().hasAll(['unidade_id', 'nome', 'tipo', 'ownerId'])
+          && data.keys().size() <= 6; // metadata is optional
+    }
+
+    function isValidReceipt(data) {
+      return data.unidade_id is string 
+          && data.barcode is string && data.barcode.size() <= 100
+          && data.timestamp == request.time
+          && data.ownerId == request.auth.uid
+          && data.keys().hasAll(['unidade_id', 'barcode', 'timestamp', 'ownerId'])
+          && data.keys().size() <= 9; // others optional
+    }
+
+    function isValidSensor(data) {
+      return data.mac is string && data.mac.size() == 17
+          && data.type in ['thermometer', 'hygrometer']
+          && data.ownerId == request.auth.uid
+          && data.keys().hasAll(['mac', 'type', 'ownerId'])
+          && data.keys().size() <= 7;
+    }
+
+    function isValidTelemetry(data) {
+      return data.sensor_id is string 
+          && data.value is number
+          && data.timestamp == request.time
+          && data.ownerId == request.auth.uid
+          && data.keys().hasAll(['sensor_id', 'value', 'timestamp', 'ownerId'])
+          && data.keys().size() == 4;
+    }
+
+    // --- ACCESS LOGIC ---
+
+    function isOwner(assetId) {
+      return isSignedIn() && get(/databases/$(database)/documents/assets/$(assetId)).data.ownerId == request.auth.uid;
+    }
+
+    function isDocOwner() {
+      return isSignedIn() && resource.data.ownerId == request.auth.uid;
+    }
+
+    // --- MATCH BLOCKS ---
+
+    match /assets/{assetId} {
+      allow get: if isDocOwner();
+      allow list: if isDocOwner();
+      allow create: if isSignedIn() && isValidId(assetId) && isValidAsset(incoming());
+      allow update: if isDocOwner() && isValidAsset(incoming())
+                    && incoming().ownerId == existing().ownerId; // Immutable owner
+      allow delete: if isDocOwner();
+
+      match /receipts/{receiptId} {
+        allow get: if isOwner(assetId);
+        allow list: if isDocOwner();
+        allow create: if isOwner(assetId) && isValidId(receiptId) && isValidReceipt(incoming());
+        allow delete: if isOwner(assetId);
+      }
+
+      match /sensors/{sensorId} {
+        allow get: if isOwner(assetId);
+        allow list: if isDocOwner();
+        allow create: if isOwner(assetId) && isValidId(sensorId) && isValidSensor(incoming());
+        allow update: if isOwner(assetId) && isValidSensor(incoming()) && incoming().mac == existing().mac;
+        
+        match /readings/{readingId} {
+          allow get: if isOwner(assetId);
+          allow list: if isDocOwner();
+          allow create: if isOwner(assetId) && isValidTelemetry(incoming());
+        }
+      }
+    }
+  }
+}

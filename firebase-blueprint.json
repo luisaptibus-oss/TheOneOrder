@@ -1,0 +1,264 @@
+{
+  "entities": {
+    "Organization": {
+      "title": "Business Unit / Organization",
+      "description": "Blinded corporate identity, RGPD data, and business type configuration.",
+      "type": "object",
+      "properties": {
+        "orgId": { "type": "string" },
+        "name": { "type": "string" },
+        "nif": { "type": "string" },
+        "businessType": { "type": "string", "enum": ["CAFE", "REST", "IND", "RETAIL"] },
+        "haccpModel": { "type": "string", "description": "Template ID: ISO22000, BASIC, ADVANCED" },
+        "ownerId": { "type": "string" },
+        "members": { "type": "array", "items": { "type": "string" } },
+        "vaultDocs": { "type": "array", "description": "Encrypted references to legal docs" },
+        "securityConfig": {
+          "type": "object",
+          "properties": {
+            "totpEnabled": { "type": "boolean" },
+            "totpSecret": { "type": "string", "description": "Encrypted TOTP secret" }
+          }
+        }
+      },
+      "required": ["orgId", "name", "businessType", "ownerId"]
+    },
+    "Zone": {
+      "title": "Operation Zone",
+      "description": "Physical area mapped by risk and usage state.",
+      "type": "object",
+      "properties": {
+        "nome": { "type": "string" },
+        "type": { "type": "string", "enum": ["AMBIENT", "POSITIVE_COLD", "NEGATIVE_COLD", "HOT_ZONE", "CRITICAL_RISK", "ALLERGEN_ISOLATED"] },
+        "usageState": { "type": "string", "enum": ["NO_MANIPULATION", "MANIPULATION", "PREPARATION"] },
+        "haccpLine": { "type": "string", "enum": ["MEAT", "VEG", "BAKERY", "PASTRY", "GENERAL"] },
+        "temp_min": { "type": "number" },
+        "temp_max": { "type": "number" }
+      },
+      "required": ["nome", "type", "usageState"]
+    },
+    "Equipment": {
+      "title": "Physical Equipment",
+      "description": "Inventory of ovens, fridges, workbenches.",
+      "type": "object",
+      "properties": {
+        "brand": { "type": "string" },
+        "model": { "type": "string" },
+        "zoneId": { "type": "string" },
+        "type": { "type": "string", "enum": ["FRIDGE", "OVEN", "FREEZER", "BENCH"] }
+      },
+      "required": ["type", "zoneId"]
+    },
+    "Sensor": {
+      "title": "IoT Sensor",
+      "description": "WiFi/MQTT/CoAP device linked to equipment or zone.",
+      "type": "object",
+      "properties": {
+        "mac": { "type": "string" },
+        "linkedTo": { "type": "string", "description": "ID of Zone or Equipment" },
+        "type": { "type": "string", "enum": ["thermometer", "hygrometer", "power_monitor"] },
+        "ownerId": { "type": "string" }
+      },
+      "required": ["mac", "type", "ownerId"]
+    },
+    "Receipt": {
+      "title": "Raw Material Receipt",
+      "description": "MP tracking with batch and expiration.",
+      "type": "object",
+      "properties": {
+        "barcode": { "type": "string" },
+        "state": { "type": "string", "enum": ["NO_MANIPULATION", "MANIPULATION", "PREPARATION"] },
+        "validade": { "type": "string", "format": "date" },
+        "lote": { "type": "string" },
+        "ownerId": { "type": "string" }
+      },
+      "required": ["barcode", "ownerId"]
+    },
+    "MSDS": {
+      "title": "Safety & Technical Datasheet",
+      "description": "Extracted info from chemical FTS/MSDS using AI Analysis.",
+      "type": "object",
+      "properties": {
+        "productName": { "type": "string" },
+        "activeEngredient": { "type": "string" },
+        "dosageNormal": { "type": "string", "description": "e.g., 2% or 20ml/L" },
+        "dosageShock": { "type": "string" },
+        "contactTime": { "type": "string" },
+        "ppeRequired": { "type": "array", "items": { "type": "string" } },
+        "hazardStatements": { "type": "array", "items": { "type": "string" } },
+        "fileRef": { "type": "string" }
+      },
+      "required": ["productName", "dosageNormal"]
+    },
+    "AccessLog": {
+      "title": "System Access Log",
+      "description": "Audit trail of user logins and sessions.",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string" },
+        "userEmail": { "type": "string" },
+        "timestamp": { "type": "string", "format": "date-time" },
+        "action": { "type": "string", "enum": ["LOGIN", "LOGOUT", "SWITCH_ORG", "VIEW_LOGS"] },
+        "organizationId": { "type": "string" },
+        "isAdmin": { "type": "boolean" }
+      },
+      "required": ["userId", "timestamp", "action"]
+    },
+    "UserProfile": {
+      "title": "Extended User Profile",
+      "description": "System access configuration per user.",
+      "type": "object",
+      "properties": {
+        "email": { "type": "string" },
+        "role": { "type": "string", "enum": ["ADMIN", "MANAGER", "OPERATOR"] },
+        "assignedOrgs": { "type": "array", "items": { "type": "string" } },
+        "totpEnabled": { "type": "boolean" },
+        "preRegistered": { "type": "boolean" }
+      },
+      "required": ["email", "role"]
+    },
+    "MP_FTS": {
+      "title": "Raw Material Technical Sheet",
+      "description": "Extracted specifications from supplier FTS for Raw Materials.",
+      "type": "object",
+      "properties": {
+        "materialName": { "type": "string" },
+        "allergens": { "type": "array", "items": { "type": "string" } },
+        "storageTemp": { "type": "string" },
+        "handlingInstructions": { "type": "string" },
+        "shelfLife": { "type": "string" },
+        "supplierId": { "type": "string" }
+      },
+      "required": ["materialName", "allergens"]
+    },
+    "ProductManual": {
+      "title": "Product/Service Procedure Manual",
+      "description": "Custom operation manual generated per finished product/service.",
+      "type": "object",
+      "properties": {
+        "targetProduct": { "type": "string" },
+        "riskLevel": { "type": "string", "enum": ["LOW", "MEDIUM", "HIGH", "CRITICAL"] },
+        "steps": { "type": "array", "items": { "type": "string" } },
+        "requiredMaterials": { "type": "array", "items": { "type": "string" } },
+        "ccpLinked": { "type": "array", "items": { "type": "string" } }
+      },
+      "required": ["targetProduct", "riskLevel"]
+    },
+    "CleaningPlan": {
+      "title": "SOP / Cleaning Plan",
+      "description": "Procedure definition: Who, What, How, Products (POPs).",
+      "type": "object",
+      "properties": {
+        "name": { "type": "string" },
+        "zoneId": { "type": "string" },
+        "frequency": { "type": "string", "enum": ["DAILY", "WEEKLY", "MONTHLY", "AFTER_USE"] },
+        "method": { "type": "string" },
+        "chemicals": { "type": "array", "items": { "type": "string" } },
+        "concentration": { "type": "string" },
+        "ownerId": { "type": "string" }
+      },
+      "required": ["name", "zoneId", "frequency", "method", "ownerId"]
+    },
+    "CleaningLog": {
+      "title": "Sanitization Log",
+      "description": "Execution record signed by staff with verification results.",
+      "type": "object",
+      "properties": {
+        "planId": { "type": "string" },
+        "staffUid": { "type": "string" },
+        "timestamp": { "type": "string", "format": "date-time" },
+        "visualVerified": { "type": "boolean" },
+        "microVerified": { "type": "boolean" },
+        "swabResult": { "type": "string" },
+        "correctiveAction": { "type": "string" },
+        "totpSigned": { "type": "boolean" },
+        "ownerId": { "type": "string" }
+      },
+      "required": ["planId", "staffUid", "timestamp", "ownerId"]
+    },
+    "CCP": {
+      "title": "Critical Control Point",
+      "description": "Monitoring points for FSSC 22000 compliance with automated alerts.",
+      "type": "object",
+      "properties": {
+        "name": { "type": "string" },
+        "description": { "type": "string" },
+        "limitMin": { "type": "number" },
+        "limitMax": { "type": "number" },
+        "sensorId": { "type": "string" },
+        "status": { "type": "string", "enum": ["CONFORM", "DEVIATION", "CRITICAL"] }
+      },
+      "required": ["name", "limitMin", "limitMax"]
+    },
+    "Supplier": {
+      "title": "Approved Supplier",
+      "description": "Supplier certification tracking for ISO 22000.",
+      "type": "object",
+      "properties": {
+        "name": { "type": "string" },
+        "certId": { "type": "string" },
+        "expiration": { "type": "string", "format": "date" },
+        "auditStatus": { "type": "string", "enum": ["APPROVED", "PENDING", "REJECTED"] }
+      },
+      "required": ["name", "certId"]
+    }
+  },
+  "firestore": {
+    "/organizations/{orgId}": {
+      "schema": "Organization",
+      "description": "Main unit configuration."
+    },
+    "/organizations/{orgId}/zones/{zoneId}": {
+      "schema": "Zone",
+      "description": "Physical mapped areas."
+    },
+    "/organizations/{orgId}/msds/{msdsId}": {
+      "schema": "MSDS",
+      "description": "Chemical safety sheets database."
+    },
+    "/organizations/{orgId}/rawMaterialsFTS/{ftsId}": {
+      "schema": "MP_FTS",
+      "description": "Supplier technical sheets for ingredients."
+    },
+    "/organizations/{orgId}/productManuals/{manualId}": {
+      "schema": "ProductManual",
+      "description": "Generated procedures per product."
+    },
+    "/organizations/{orgId}/accessLogs/{logId}": {
+      "schema": "AccessLog",
+      "description": "Activity logs for the organization."
+    },
+    "/system/users/{userId}": {
+      "schema": "UserProfile",
+      "description": "Global user access profiles."
+    },
+    "/organizations/{orgId}/cleaningPlans/{planId}": {
+      "schema": "CleaningPlan",
+      "description": "SOPs for hygiene."
+    },
+    "/organizations/{orgId}/cleaningLogs/{logId}": {
+      "schema": "CleaningLog",
+      "description": "Historical hygiene records."
+    },
+    "/organizations/{orgId}/ccps/{ccpId}": {
+      "schema": "CCP",
+      "description": "Critical Control Points."
+    },
+    "/organizations/{orgId}/suppliers/{supplierId}": {
+      "schema": "Supplier",
+      "description": "Approved supplier list."
+    },
+    "/organizations/{orgId}/equipment/{eqId}": {
+      "schema": "Equipment",
+      "description": "Asset inventory."
+    },
+    "/organizations/{orgId}/sensors/{sensorId}": {
+      "schema": "Sensor",
+      "description": "IoT devices."
+    },
+    "/organizations/{orgId}/receipts/{receiptId}": {
+      "schema": "Receipt",
+      "description": "MP Receipts."
+    }
+  }
+}

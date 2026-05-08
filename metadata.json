@@ -1,0 +1,13 @@
+{
+  "name": "The One Order",
+  "description": "The One Order Food Safety Administration Service - Plataforma blindada de segurança alimentar, monitorização IoT e gestão de rastreabilidade.",
+  "requestFramePermissions": [
+    "camera"
+  ],
+  "majorCapabilities": [
+    "IoT Data Collection",
+    "Real-time Monitoring",
+    "Barcode Scanning",
+    "GDPR Compliant Vault"
+  ]
+}
